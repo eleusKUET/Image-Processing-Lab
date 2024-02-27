@@ -40,9 +40,6 @@ def convolve(image, kernel, center=None):
 
     return new_image
 
-def myKernel():
-    return np.array([[1, 4, 7, 4, 1], [4, 16, 26, 16, 4], [7, 26, 41, 26, 7], [4, 16, 26, 16, 4], [1, 4, 7, 4, 1]]) / 273
-
 def gauss(x, y, sigma):
     pw = -0.5 * (x * x / (sigma[0] ** 2) + y * y / (sigma[1] ** 2))
     return 1 / (2 * math.pi * sigma[0] * sigma[1]) * math.exp(pw)
@@ -65,8 +62,8 @@ def laplacian_kernel():
     return np.array([[0, -1, 0], [-1, 4, -1], [0, -1, 0]])
 
 def LoG(x, y, sigma):
-    pw = (x ** 2 + y ** 2) / (2 * sigma ** 2)
-    res = -1 / (math.pi * sigma ** 4) * (1 - pw) * math.exp(-pw)
+    pw = (x ** 2 + y ** 2) / (2 * sigma[0] * sigma[1])
+    res = -1 / (math.pi * sigma[0] ** 2 * sigma[1] ** 2) * (1 - pw) * math.exp(-pw)
     return res
 
 def LoG_kernel(dim, sigma, center=None):
@@ -90,17 +87,132 @@ def sobel_y_kernel():
                         [0, 0, 0],
                         [1, 2, 1]])
 
-kernel = gaussian_kernel((3,3), (1.5, 1.5))
-img = cv.imread('Lena.jpg', 0)
+def channel_seperator(colored_image):
+    first = np.zeros((colored_image.shape[0], colored_image.shape[1]))
+    second = np.zeros((colored_image.shape[0], colored_image.shape[1]))
+    third = np.zeros((colored_image.shape[0], colored_image.shape[1]))
+    for i in range(colored_image.shape[0]):
+        for j in range(colored_image.shape[1]):
+            first[i, j] = colored_image[i, j, 0]
+            second[i, j] = colored_image[i, j, 1]
+            third[i, j] = colored_image[i, j, 2]
+    return [first, second, third]
 
-cv.imshow('Input', img)
-cv.waitKey(0)
+def channel_merger(first, second, third):
+    image = np.zeros((first.shape[0], first.shape[1], 3))
+    for i in range(first.shape[0]):
+        for j in range(first.shape[1]):
+            image[i, j, 0] = first[i, j]
+            image[i, j, 1] = second[i, j]
+            image[i, j, 2] = third[i, j]
+    return image
 
-output = convolve(img, kernel)
-cv.imshow('Output', np.rint(output).astype(np.uint8))
-cv.waitKey(0)
+def convolve3D(image, kernel, center=None):
+    channels = channel_seperator(image)
+    channels[0] = convolve(channels[0], kernel, center)
+    channels[1] = convolve(channels[1], kernel, center)
+    channels[2] = convolve(channels[2], kernel, center)
+    return channel_merger(channels[0], channels[1], channels[2])
 
-new_img = cv.normalize(output, None, 0, 255, cv.NORM_MINMAX)
-cv.imshow('Normalized', np.rint(new_img).astype(np.uint8))
-cv.waitKey(0)
-cv.destroyAllWindows()
+def hsv_normalizer(image):
+    channels = channel_seperator(image)
+    channels[0] = cv.normalize(channels[0], None, 0, 179, cv.NORM_MINMAX)
+    channels[1] = cv.normalize(channels[1], None, 0, 255, cv.NORM_MINMAX)
+    channels[2] = cv.normalize(channels[2], None, 0, 255, cv.NORM_MINMAX)
+    return channel_merger(channels[0], channels[1], channels[2])
+
+def output_generator(kernel, center=None):
+    print('''
+        Choose an option, e.g. 1 for grayscale image:
+        1. Grayscale image
+        2. Color image
+    ''')
+    img_id = int(input('Enter mode:'))
+    if img_id == 1:
+        print('You choosed grayscale mode. Applying convolution...')
+        image = cv.imread('Lena.jpg', cv.IMREAD_GRAYSCALE)
+        output = convolve(image, kernel, center)
+        normalized_output = cv.normalize(output, None, 0, 255, cv.NORM_MINMAX)
+
+        cv.imshow('Input', image)
+        cv.waitKey(0)
+        cv.imshow('Output before normalization', np.rint(output).astype(np.uint8))
+        cv.waitKey(0)
+        cv.imshow('Normalized output', np.rint(normalized_output).astype(np.uint8))
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+    elif img_id == 2:
+        print('You choosed color image mode. Applying convolution....')
+        image = cv.imread('Lena.jpg', 1)
+        output = convolve3D(image, kernel, center)
+        normalized_output = cv.normalize(output, None, 0, 255, cv.NORM_MINMAX)
+        hsv_image = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+        hsv_output = convolve3D(hsv_image, kernel, center)
+        hsv_normalized_output = hsv_normalizer(hsv_output)
+
+        cv.imshow('RGB output', np.rint(normalized_output).astype(np.uint8))
+        cv.waitKey(0)
+        cv.imshow('HSV output', np.rint(hsv_normalized_output).astype(np.uint8))
+        cv.waitKey(0)
+        #hsv_normalized_output = cv.cvtColor(hsv_normalized_output, cv.COLOR_HSV2BGR)
+        dif_output = normalized_output - hsv_normalized_output
+        dif_output = cv.normalize(dif_output, None, 0, 255, cv.NORM_MINMAX)
+        cv.imshow('Output difference', np.rint(dif_output).astype(np.uint8))
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+
+
+def main():
+    print('Welcome to the CLI of convolution application')
+    while True:
+        print('''
+            Choose a kernel for convolution, e.g. 1 for gaussian kernel:
+            1. gaussian 
+            2. mean
+            3. laplacian
+            4. LoG
+            5. sobel x 
+            6. sobel y
+            7. sobel both axis
+        ''')
+        kernel_id = int(input('Enter a kernel id:'))
+
+        if kernel_id == 1:
+            print('You choosed gaussian kernel')
+            print('Enter dimension, center_x, center_y in a single line:')
+            dim, center_x, center_y = [int(x) for x in input().split()]
+            sigma_x, sigma_y = [float(x) for x in input('Enter sigma_x, sigma_y in a single line:').split()]
+            output_generator(gaussian_kernel((dim, dim), (sigma_x, sigma_y), (center_x, center_y)))
+
+        elif kernel_id == 2:
+            print('You choosed mean kernel')
+            print('Enter dimension, center_x, center_y in a single line:')
+            dim, center_x, center_y = [int(x) for x in input().split()]
+            output_generator(mean_kernel((dim, dim)), (center_x, center_y))
+
+        elif kernel_id == 3:
+            print('You choosed laplacian kernel')
+            output_generator(laplacian_kernel())
+
+        elif kernel_id == 4:
+            print('You choosed LoG kernel')
+            print('Enter dimension, center_x, center_y in a single line:')
+            dim, center_x, center_y = [int(x) for x in input().split()]
+            sigma_x, sigma_y = [float(x) for x in input('Enter sigma_x, sigma_y in a single line:').split()]
+            output_generator(LoG_kernel((dim, dim), (sigma_x, sigma_y), (center_x, center_y)))
+
+        elif kernel_id == 5:
+            print('You choosed sobel x derivative kernel')
+            output_generator(sobel_x_kernel())
+
+        elif kernel_id == 6:
+            print('You choosed sobel y derivative kernel')
+            output_generator(sobel_y_kernel())
+
+        elif kernel_id == 7:
+            print('You choosed sobel kernel on both axis')
+            output_generator(np.dot(sobel_x_kernel(), sobel_y_kernel()))
+
+
+if __name__ == '__main__':
+    main()
