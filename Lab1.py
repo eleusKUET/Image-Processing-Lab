@@ -147,14 +147,16 @@ def output_generator(kernel, center=None):
         output = convolve3D(image, kernel, center)
         normalized_output = cv.normalize(output, None, 0, 255, cv.NORM_MINMAX)
         hsv_image = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+        print(hsv_image)
         hsv_output = convolve3D(hsv_image, kernel, center)
+        print(hsv_output)
         hsv_normalized_output = hsv_normalizer(hsv_output)
 
         cv.imshow('RGB output', np.rint(normalized_output).astype(np.uint8))
         cv.waitKey(0)
         cv.imshow('HSV output', np.rint(hsv_normalized_output).astype(np.uint8))
         cv.waitKey(0)
-        #hsv_normalized_output = cv.cvtColor(hsv_normalized_output, cv.COLOR_HSV2BGR)
+        hsv_normalized_output = cv.cvtColor(np.rint(hsv_normalized_output).astype(np.uint8), cv.COLOR_HSV2BGR)
         dif_output = normalized_output - hsv_normalized_output
         dif_output = cv.normalize(dif_output, None, 0, 255, cv.NORM_MINMAX)
         cv.imshow('Output difference', np.rint(dif_output).astype(np.uint8))
