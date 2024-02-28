@@ -121,7 +121,7 @@ def hsv_normalizer(image):
     channels[2] = cv.normalize(channels[2], None, 0, 255, cv.NORM_MINMAX)
     return channel_merger(channels[0], channels[1], channels[2])
 
-def output_generator(kernel, center=None):
+def output_generator(kernel, center=None, both=None):
     print('''
         Choose an option, e.g. 1 for grayscale image:
         1. Grayscale image
@@ -132,6 +132,8 @@ def output_generator(kernel, center=None):
         print('You choosed grayscale mode. Applying convolution...')
         image = cv.imread('Lena.jpg', cv.IMREAD_GRAYSCALE)
         output = convolve(image, kernel, center)
+        if both is not None:
+            output = np.sqrt(output ** 2 + convolve(image, both, center) ** 2)
         normalized_output = cv.normalize(output, None, 0, 255, cv.NORM_MINMAX)
 
         cv.imshow('Input', image)
@@ -145,11 +147,15 @@ def output_generator(kernel, center=None):
         print('You choosed color image mode. Applying convolution....')
         image = cv.imread('Lena.jpg', 1)
         output = convolve3D(image, kernel, center)
+        if both is not None:
+            output = np.sqrt(output ** 2 + convolve3D(image, both, center) ** 2)
         normalized_output = cv.normalize(output, None, 0, 255, cv.NORM_MINMAX)
         hsv_image = cv.cvtColor(image, cv.COLOR_BGR2HSV)
-        print(hsv_image)
+        #print(hsv_image)
         hsv_output = convolve3D(hsv_image, kernel, center)
-        print(hsv_output)
+        if both is not None:
+            hsv_output = np.sqrt(hsv_output ** 2 + convolve3D(hsv_image, both, center) ** 2)
+        #print(hsv_output)
         hsv_normalized_output = hsv_normalizer(hsv_output)
 
         cv.imshow('RGB output', np.rint(normalized_output).astype(np.uint8))
@@ -213,7 +219,7 @@ def main():
 
         elif kernel_id == 7:
             print('You choosed sobel kernel on both axis')
-            output_generator(np.dot(sobel_x_kernel(), sobel_y_kernel()))
+            output_generator(sobel_x_kernel(), None, sobel_y_kernel())
 
 
 if __name__ == '__main__':
